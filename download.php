@@ -2,19 +2,22 @@
 require 'db.php';
 
 $id = $_GET['id'] ?? 0;
-$doc = DB::getDocument($id);
 
-if (!$doc) {
+if (empty($id)) {
     header("HTTP/1.0 404 Not Found");
-    die("File not found");
+    exit;
 }
 
-// Set appropriate headers
-header("Content-Type: " . $doc['file_type']);
-header("Content-Length: " . $doc['file_size']);
-header("Content-Disposition: attachment; filename=\"" . $doc['original_name'] . "\"");
+$document = DB::getDocument($id);
 
-// Output the file content
-echo $doc['content'];
+if (!$document) {
+    header("HTTP/1.0 404 Not Found");
+    exit;
+}
+
+header("Content-Type: " . $document['file_type']);
+header("Content-Length: " . $document['file_size']);
+header("Content-Disposition: attachment; filename=\"" . $document['original_name'] . "\"");
+
+echo $document['file_content'];
 exit;
-?>

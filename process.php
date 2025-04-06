@@ -11,6 +11,7 @@ if (!file_exists('output')) {
 $file = $_GET['file'] ?? '';
 $operation = $_GET['operation'] ?? '';
 $files = [];
+$fileIds = [];
 
 if (empty($operation)) {
     outputError("No operation specified.");
@@ -20,14 +21,19 @@ if (empty($operation)) {
 // For merge operation, get files from session
 if ($operation === 'merge') {
     $files = $_SESSION['uploaded_files'] ?? [];
+    $fileIds = $_SESSION['uploaded_file_ids'] ?? [];
     if (empty($files)) {
         outputError("No files found for merging. Please try again.");
         exit;
     }
     unset($_SESSION['uploaded_files']);
+    unset($_SESSION['uploaded_file_ids']);
 } elseif (empty($file) || !file_exists($file)) {
     outputError("Invalid file path or file not found.");
     exit;
+} else {
+    $fileId = $_SESSION['uploaded_file_id'] ?? null;
+    unset($_SESSION['uploaded_file_id']);
 }
 
 // Check if the PDF is compatible with FPDI for operations that need it
@@ -86,7 +92,7 @@ switch ($operation) {
         
         if ($success) {
             // Get all split files that were created
-            $outputFiles = glob(sys_get_temp_dir() . '/split_*.pdf');
+            $outputFiles = glob('output/split_*.pdf');
             usort($outputFiles, function($a, $b) {
                 preg_match('/split_(\d+)\.pdf/', $a, $matchesA);
                 preg_match('/split_(\d+)\.pdf/', $b, $matchesB);
@@ -144,34 +150,82 @@ switch ($operation) {
             $savings = round(($originalSize - $compressedSize) / $originalSize * 100, 1);
             $resultMessage = "PDF successfully compressed! Size reduced by $savings% (From " . 
                 formatBytes($originalSize) . " to " . formatBytes($compressedSize) . ")";
+            
+            // Store result in database
+            $outputDocId = DB::storeDocument([
+                'name' => 'compressed_' . time() . '.pdf',
+                'type' => 'application/pdf',
+                'tmp_name' => $resultFile,
+                'size' => $compressedSize,
+                'error' => 0
+            ], $operation);
+            
+            // Record operation
+            DB::storeOperation($operation, [$fileId], $outputDocId, [
+                'original_size' => $originalSize,
+                'compressed_size' => $compressedSize,
+                'savings_percent' => $savings
+            ]);
+            
+            $resultFile = 'download.php?id=' . $outputDocId;
         } else {
             outputError("Failed to compress PDF. Make sure GhostScript is installed on the server.");
             exit;
         }
         break;
 
-        case 'convert':
-            $pageNumber = isset($_GET['convertPage']) ? (int)$_GET['convertPage'] : 1;
-            $resultFile = 'output/image_' . time() . '.png';
-            $success = convertPDFToImage($file, $resultFile, $pageNumber);
-            if ($success) {
-                $resultMessage = "PDF page $pageNumber successfully converted to image!";
-            } else {
-                outputError("Failed to convert PDF to image. Make sure ImageMagick is installed on the server.");
-                exit;
-            }
-            break;
+    case 'convert':
+        $pageNumber = isset($_GET['convertPage']) ? (int)$_GET['convertPage'] : 1;
+        $resultFile = 'output/image_' . time() . '.png';
+        $success = convertPDFToImage($file, $resultFile, $pageNumber);
+        if ($success) {
+            $resultMessage = "PDF page $pageNumber successfully converted to image!";
+            
+            // Store result in database
+            $outputDocId = DB::storeDocument([
+                'name' => 'image_' . time() . '.png',
+                'type' => 'image/png',
+                'tmp_name' => $resultFile,
+                'size' => filesize($resultFile),
+                'error' => 0
+            ], $operation);
+            
+            // Record operation
+            DB::storeOperation($operation, [$fileId], $outputDocId, [
+                'page_number' => $pageNumber
+            ]);
+            
+            $resultFile = 'download.php?id=' . $outputDocId;
+        } else {
+            outputError("Failed to convert PDF to image. Make sure ImageMagick is installed on the server.");
+            exit;
+        }
+        break;
 
-        case 'pdf-to-word':
-                $resultFile = 'output/converted_' . time() . '.docx';
-                $success = convertPDFToWord($file, $resultFile);
-                if ($success) {
-                    $resultMessage = "PDF successfully converted to Word document!";
-                } else {
-                    outputError("Failed to convert PDF to Word. Make sure LibreOffice or OpenOffice is installed on the server.");
-                    exit;
-                }
-                break;
+    case 'pdf-to-word':
+        $resultFile = 'output/converted_' . time() . '.docx';
+        $success = convertPDFToWord($file, $resultFile);
+        if ($success) {
+            $resultMessage = "PDF successfully converted to Word document!";
+            
+            // Store result in database
+            $outputDocId = DB::storeDocument([
+                'name' => 'converted_' . time() . '.docx',
+                'type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'tmp_name' => $resultFile,
+                'size' => filesize($resultFile),
+                'error' => 0
+            ], $operation);
+            
+            // Record operation
+            DB::storeOperation($operation, [$fileId], $outputDocId);
+            
+            $resultFile = 'download.php?id=' . $outputDocId;
+        } else {
+            outputError("Failed to convert PDF to Word. Make sure LibreOffice or OpenOffice is installed on the server.");
+            exit;
+        }
+        break;
 
     default:
         outputError("Unknown operation: $operation");

@@ -23,6 +23,7 @@ if ($operation === 'merge') {
     }
     
     $files = [];
+    $fileIds = [];
     $fileCount = count($_FILES['pdfs']['name']);
     
     if ($fileCount < 2) {
@@ -43,6 +44,11 @@ if ($operation === 'merge') {
         $file = processUploadedFile($fileData);
         if ($file) {
             $files[] = $file;
+            // Store in database and get ID
+            $fileId = DB::storeDocument($fileData, 'upload');
+            if ($fileId) {
+                $fileIds[] = $fileId;
+            }
         } else {
             // Clean up any already uploaded files
             foreach ($files as $uploadedFile) {
@@ -54,11 +60,11 @@ if ($operation === 'merge') {
         }
     }
     
-    // Store files in session for processing
+    // Store files and IDs in session for processing
     $_SESSION['uploaded_files'] = $files;
+    $_SESSION['uploaded_file_ids'] = $fileIds;
     header("Location: process.php?operation=" . urlencode($operation));
 } else {
-    // Single file operations
     // Single file operations
     if (!isset($_FILES['pdf']) || $_FILES['pdf']['error'] != 0) {
         showError("Upload failed. Error code: " . ($_FILES['pdf']['error'] ?? 'Unknown'));
@@ -70,11 +76,15 @@ if ($operation === 'merge') {
         exit;
     }
 
+    // Store in database and get ID
+    $fileId = DB::storeDocument($_FILES['pdf'], 'upload');
+    $_SESSION['uploaded_file_id'] = $fileId;
+
     // Add parameters for split operation or convert operation
     $additionalParams = '';
     if ($operation === 'split' && isset($_POST['startPage']) && isset($_POST['endPage'])) {
         $additionalParams = "&startPage=" . urlencode($_POST['startPage']) . 
-                        "&endPage=" . urlencode($_POST['endPage']);
+                         "&endPage=" . urlencode($_POST['endPage']);
     } else if ($operation === 'convert' && isset($_POST['convertPage'])) {
         $additionalParams = "&convertPage=" . urlencode($_POST['convertPage']);
     }

@@ -2,6 +2,7 @@
 // Start session to store uploaded files temporarily
 session_start();
 
+
 // Clear previous uploads if any
 if (isset($_SESSION['uploaded_files'])) {
     unset($_SESSION['uploaded_files']);
