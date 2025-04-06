@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+require_once 'db.php';
 require 'libs/pdf-tools.php';
 
 // Create output directory if it doesn't exist

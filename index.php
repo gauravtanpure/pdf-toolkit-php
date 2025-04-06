@@ -1,7 +1,8 @@
 <?php
 // Start session to store uploaded files temporarily
 session_start();
-
+require_once 'auth.php';
+Auth::redirectIfNotLoggedIn();
 
 // Clear previous uploads if any
 if (isset($_SESSION['uploaded_files'])) {
@@ -21,6 +22,10 @@ if (isset($_SESSION['uploaded_files'])) {
     <header>
         <h1><i class="fas fa-file-pdf"></i> PDF Toolkit</h1>
         <p class="subtitle">Simple and powerful tools for your PDF files</p>
+        <div class="user-info">
+            Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?> | 
+            <a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
     </header>
     
     <div class="card">

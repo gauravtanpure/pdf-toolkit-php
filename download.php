@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+require_once 'db.php';
 
 $id = $_GET['id'] ?? 0;
 

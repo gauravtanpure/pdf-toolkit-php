@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+require_once 'db.php';
 
 // Create uploads directory if it doesn't exist
 if (!file_exists('uploads')) {
